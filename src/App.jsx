@@ -461,7 +461,7 @@ export default function App() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Seleksi Klub</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3.
+              Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3. <span className="font-medium text-slate-700">(Dibuat oleh Team XI RPL)</span>
             </p>
           </div>
           <button
@@ -487,7 +487,7 @@ export default function App() {
                     onClick={() => setRawInput(SEED_DATA)}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
                   >
-                    Muat data contoh (169 siswa)
+                    Muat data (162 siswa)
                   </button>
                   {rawInput && (
                     <button
