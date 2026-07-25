@@ -51,25 +51,41 @@ function parseData(text) {
 
 function assignClubs(students, capacity) {
   const counts = {}
-  const results = students.map((s) => {
-    const choices = [s.pilihan1, s.pilihan2, s.pilihan3].filter((c) => c !== '')
-    let assigned = null
-    let choiceIndex = -1
+  const settled = new Map() // idx -> result
 
-    for (let i = 0; i < choices.length; i++) {
-      const club = choices[i]
+  let pending = students
+  const rankKeys = ['pilihan1', 'pilihan2', 'pilihan3']
+
+  for (let round = 0; round < rankKeys.length; round++) {
+    const key = rankKeys[round]
+    const byClub = new Map()
+
+    pending.forEach((s) => {
+      const club = s[key]
+      if (!club) return
+      if (!byClub.has(club)) byClub.set(club, [])
+      byClub.get(club).push(s)
+    })
+
+    const acceptedIdx = new Set()
+    byClub.forEach((candidates, club) => {
       counts[club] = counts[club] ?? 0
-      if (counts[club] < capacity) {
-        assigned = club
-        choiceIndex = i
-        counts[club] += 1
-        break
-      }
-    }
+      const freeSlots = capacity - counts[club]
+      if (freeSlots <= 0) return
+      // candidates are already in timestamp order (order preserved from `pending`)
+      candidates.slice(0, freeSlots).forEach((s) => {
+        settled.set(s.idx, { ...s, assigned: club, choiceIndex: round })
+        acceptedIdx.add(s.idx)
+      })
+      counts[club] += Math.min(freeSlots, candidates.length)
+    })
 
-    return { ...s, assigned, choiceIndex }
-  })
+    pending = pending.filter((s) => !acceptedIdx.has(s.idx))
+  }
 
+  pending.forEach((s) => settled.set(s.idx, { ...s, assigned: null, choiceIndex: -1 }))
+
+  const results = students.map((s) => settled.get(s.idx))
   return { results, counts }
 }
 
@@ -131,7 +147,7 @@ function downloadCSV(rows) {
 
 export default function App() {
   const [rawInput, setRawInput] = useState('')
-  const [capacity, setCapacity] = useState(15)
+  const [capacity, setCapacity] = useState(28)
   const [processed, setProcessed] = useState(null) // { results, counts }
   const [filter, setFilter] = useState('semua') // 'semua' | 'tergeser'
   const [error, setError] = useState('')
@@ -224,7 +240,7 @@ export default function App() {
         <header className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Seleksi Klub</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp — kuota penuh akan digeser ke Pilihan 2, lalu Pilihan 3.
+            Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3.
           </p>
         </header>
 
