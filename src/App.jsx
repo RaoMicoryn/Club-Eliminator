@@ -53,6 +53,11 @@ function assignClubs(students, capacity) {
   const counts = {}
   const settled = new Map() // idx -> result
 
+  // Students are already sorted by timestamp ascending. We process choice
+  // rank by choice rank (round 1 = everyone's Pilihan 1, round 2 = Pilihan 2
+  // for whoever didn't make it in round 1, round 3 = Pilihan 3) so a
+  // fallback choice can never take a seat away from someone whose Pilihan 1
+  // that club actually was, no matter whose timestamp is earlier.
   let pending = students
   const rankKeys = ['pilihan1', 'pilihan2', 'pilihan3']
 
@@ -89,8 +94,6 @@ function assignClubs(students, capacity) {
   return { results, counts }
 }
 
-const NO_CLUB = '— Tidak dapat klub —'
-
 const CHOICE_LABEL = {
   0: 'Pilihan 1',
   1: 'Pilihan 2',
@@ -98,19 +101,10 @@ const CHOICE_LABEL = {
 }
 
 const STATUS_STYLE = {
-  0: { label: 'Diterima — Pilihan 1', className: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
-  1: { label: 'Tergeser ke Pilihan 2', className: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
-  2: { label: 'Tergeser ke Pilihan 3', className: 'bg-orange-50 text-orange-700 ring-orange-600/20' },
-  '-1': { label: 'Tidak dapat klub', className: 'bg-red-50 text-red-700 ring-red-600/20' },
-}
-
-function StatusBadge({ choiceIndex }) {
-  const s = STATUS_STYLE[choiceIndex]
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${s.className}`}>
-      {s.label}
-    </span>
-  )
+  0: { label: 'Diterima — Pilihan 1' },
+  1: { label: 'Tergeser ke Pilihan 2' },
+  2: { label: 'Tergeser ke Pilihan 3' },
+  '-1': { label: 'Tidak dapat klub' },
 }
 
 function toCSV(rows) {
@@ -145,15 +139,227 @@ function downloadCSV(rows) {
   URL.revokeObjectURL(url)
 }
 
+const CONFETTI_COLORS = ['#f43f5e', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6']
+
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 46 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        duration: 1.6 + Math.random() * 1.3,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        rotate: Math.round(Math.random() * 360),
+        size: 5 + Math.random() * 6,
+      })),
+    []
+  )
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="animate-confetti absolute top-0 rounded-sm"
+          style={{
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size * 0.45,
+            backgroundColor: p.color,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            transform: `rotate(${p.rotate}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function playTone(freqs, { type = 'sine', gain = 0.2, noteDuration = 0.14, gap = 0.02 } = {}) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    let t = ctx.currentTime
+    freqs.forEach((freq) => {
+      const osc = ctx.createOscillator()
+      const g = ctx.createGain()
+      osc.type = type
+      osc.frequency.setValueAtTime(freq, t)
+      g.gain.setValueAtTime(0, t)
+      g.gain.linearRampToValueAtTime(gain, t + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.001, t + noteDuration)
+      osc.connect(g)
+      g.connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + noteDuration + 0.02)
+      t += noteDuration + gap
+    })
+    setTimeout(() => ctx.close(), (t + 0.3) * 1000)
+  } catch {
+    // Autoplay restrictions or unsupported browser — fail silently.
+  }
+}
+
+function playSuccessSound() {
+  // Cheerful ascending chime: C5 - E5 - G5 - C6
+  playTone([523.25, 659.25, 783.99, 1046.5], { type: 'triangle', gain: 0.18, noteDuration: 0.13, gap: 0.015 })
+}
+
+function playFailSound() {
+  // Gentle descending tone
+  playTone([392.0, 329.63, 261.63], { type: 'sine', gain: 0.15, noteDuration: 0.22, gap: 0.03 })
+}
+
+const RAIN_DROP_COUNT = 30
+
+function Rain() {
+  const drops = useMemo(
+    () =>
+      Array.from({ length: RAIN_DROP_COUNT }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 1.6,
+        duration: 1.8 + Math.random() * 1.6,
+        height: 9 + Math.random() * 9,
+      })),
+    []
+  )
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+      {drops.map((d) => (
+        <span
+          key={d.id}
+          className="animate-rain absolute top-0 rounded-full bg-sky-300"
+          style={{
+            left: `${d.left}%`,
+            width: 2,
+            height: d.height,
+            animationDelay: `${d.delay}s`,
+            animationDuration: `${d.duration}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function CheckModal({ result, onClose, onSelectMatch, openClubs, capacity }) {
+  if (!result) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="animate-modal-pop relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-2xl"
+      >
+        {result.type === 'success' && <Confetti />}
+        {result.type === 'rejected' && <Rain />}
+
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          aria-label="Tutup"
+        >
+          ✕
+        </button>
+
+        {result.type === 'success' && (
+          <div className="relative text-center">
+            <p className="animate-bounce-in text-5xl">🎉</p>
+            <p className="mt-3 text-sm font-bold uppercase tracking-wide text-emerald-600">Selamat!</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">{result.student.nama}</p>
+            <p className="text-sm text-slate-500">{result.student.kelas}</p>
+            <p className="mt-4 text-sm text-slate-600">Kamu lolos di</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-700">{result.student.assigned}</p>
+            <p className="mt-3 text-xs font-medium text-emerald-600">
+              Diterima lewat {CHOICE_LABEL[result.student.choiceIndex]}
+            </p>
+          </div>
+        )}
+
+        {result.type === 'rejected' && (
+          <div className="text-center">
+            <p className="text-4xl">😔</p>
+            <p className="mt-3 text-lg font-bold text-red-600">Belum rejeki kali ini...</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">{result.student.nama}</p>
+            <p className="text-sm text-slate-500">{result.student.kelas}</p>
+            <p className="mt-3 text-sm text-slate-600">
+              Belum keterima di 3 pilihan:{' '}
+              <span className="font-medium text-slate-800">
+                {[result.student.pilihan1, result.student.pilihan2, result.student.pilihan3].filter(Boolean).join(' · ')}
+              </span>
+            </p>
+
+            {openClubs.length > 0 ? (
+              <div className="mt-4 text-left">
+                <p className="text-xs font-medium text-slate-700">Klub yang masih ada kuota kosong:</p>
+                <ul className="mt-2 space-y-1.5">
+                  {openClubs.map((c) => (
+                    <li
+                      key={c.club}
+                      className="flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-1.5 text-xs ring-1 ring-slate-200"
+                    >
+                      <span className="text-slate-700">{c.club}</span>
+                      <span className="font-medium text-slate-500">
+                        {c.remaining} slot ({c.filled}/{capacity})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-slate-500">Silakan hubungi panitia untuk daftar ke klub yang masih kosong.</p>
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-slate-500">Saat ini semua klub sudah penuh kuotanya.</p>
+            )}
+          </div>
+        )}
+
+        {result.type === 'notfound' && (
+          <div className="text-center">
+            <p className="text-4xl">🔍</p>
+            <p className="mt-3 text-lg font-semibold text-slate-800">Nama tidak ditemukan</p>
+            <p className="mt-1 text-sm text-slate-500">Cek ejaan nama, atau tambahkan kelas.</p>
+          </div>
+        )}
+
+        {result.type === 'multiple' && (
+          <div>
+            <p className="text-center text-lg font-semibold text-slate-800">Ada {result.matches.length} nama yang cocok</p>
+            <p className="mt-1 text-center text-sm text-slate-500">Pilih salah satu:</p>
+            <ul className="mt-3 max-h-64 divide-y divide-slate-100 overflow-y-auto">
+              {result.matches.map((m) => (
+                <li key={`${m.nama}-${m.idx}`}>
+                  <button
+                    onClick={() => onSelectMatch(m)}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition hover:bg-slate-50"
+                  >
+                    <span className="text-slate-700">{m.nama}</span>
+                    <span className="text-xs text-slate-400">{m.kelas}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [rawInput, setRawInput] = useState('')
   const [capacity, setCapacity] = useState(28)
   const [processed, setProcessed] = useState(null) // { results, counts }
-  const [filter, setFilter] = useState('semua') // 'semua' | 'tergeser'
   const [error, setError] = useState('')
-  const [view, setView] = useState('tabel') // 'tabel' | 'per-klub'
-  const [selectedClub, setSelectedClub] = useState(null)
-  const [search, setSearch] = useState('')
+  const [checkName, setCheckName] = useState('')
+  const [checkKelas, setCheckKelas] = useState('')
+  const [checkModal, setCheckModal] = useState(null)
+  const [soundOn, setSoundOn] = useState(true)
 
   const handleProcess = () => {
     setError('')
@@ -164,7 +370,7 @@ export default function App() {
       return
     }
     setProcessed(assignClubs(students, Number(capacity) || 15))
-    setSelectedClub(null)
+    setCheckModal(null)
   }
 
   const clubSummary = useMemo(() => {
@@ -189,59 +395,83 @@ export default function App() {
     return Array.from(clubs.values()).sort((a, b) => a.club.localeCompare(b.club))
   }, [processed])
 
-  const rosterByClub = useMemo(() => {
-    if (!processed) return []
-    const groups = new Map()
-    processed.results.forEach((r) => {
-      const key = r.assigned ?? NO_CLUB
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key).push(r)
-    })
-    const clubs = Array.from(groups.entries())
-      .filter(([club]) => club !== NO_CLUB)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-    const noClub = groups.get(NO_CLUB) ?? []
-    return { clubs, noClub }
-  }, [processed])
-
-  const clubTabs = useMemo(() => {
-    if (!processed) return []
-    const tabs = rosterByClub.clubs.map(([club, members]) => ({ key: club, label: club, members }))
-    if (rosterByClub.noClub.length > 0) {
-      tabs.push({ key: NO_CLUB, label: 'Tidak dapat klub', members: rosterByClub.noClub })
-    }
-    return tabs
-  }, [processed, rosterByClub])
-
-  const activeClubKey = clubTabs.some((t) => t.key === selectedClub) ? selectedClub : clubTabs[0]?.key
-  const activeClubTab = clubTabs.find((t) => t.key === activeClubKey)
-
-  const visibleRows = useMemo(() => {
-    if (!processed) return []
-    let rows = filter === 'tergeser' ? processed.results.filter((r) => r.choiceIndex !== 0) : processed.results
-    const q = search.trim().toLowerCase()
-    if (q) rows = rows.filter((r) => r.nama.toLowerCase().includes(q))
-    return rows
-  }, [processed, filter, search])
-
-  const activeClubMembers = useMemo(() => {
-    if (!activeClubTab) return []
-    const q = search.trim().toLowerCase()
-    if (!q) return activeClubTab.members
-    return activeClubTab.members.filter((m) => m.nama.toLowerCase().includes(q))
-  }, [activeClubTab, search])
-
   const tergeserCount = processed ? processed.results.filter((r) => r.choiceIndex !== 0).length : 0
   const noClubCount = processed ? processed.results.filter((r) => r.choiceIndex === -1).length : 0
+
+  const allClubNames = useMemo(() => {
+    if (!processed) return []
+    const set = new Set()
+    processed.results.forEach((r) => {
+      ;[r.pilihan1, r.pilihan2, r.pilihan3].forEach((c) => c && set.add(c))
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [processed])
+
+  const openClubs = useMemo(() => {
+    if (!processed) return []
+    return allClubNames
+      .map((club) => ({
+        club,
+        filled: processed.counts[club] ?? 0,
+        remaining: (Number(capacity) || 0) - (processed.counts[club] ?? 0),
+      }))
+      .filter((c) => c.remaining > 0)
+      .sort((a, b) => b.remaining - a.remaining)
+  }, [processed, allClubNames, capacity])
+
+  const resolveStudentResult = (student) => {
+    if (soundOn) {
+      if (student.assigned) playSuccessSound()
+      else playFailSound()
+    }
+    return {
+      type: student.assigned ? 'success' : 'rejected',
+      student,
+    }
+  }
+
+  const handleCheck = () => {
+    if (!processed) return
+    const nameQ = checkName.trim().toLowerCase()
+    if (!nameQ) return
+    const kelasQ = checkKelas.trim().toLowerCase()
+    const matches = processed.results.filter((r) => {
+      const nameMatch = r.nama.toLowerCase().includes(nameQ)
+      const kelasMatch = !kelasQ || r.kelas.toLowerCase().includes(kelasQ)
+      return nameMatch && kelasMatch
+    })
+
+    if (matches.length === 0) {
+      setCheckModal({ type: 'notfound' })
+    } else if (matches.length > 1) {
+      setCheckModal({ type: 'multiple', matches })
+    } else {
+      setCheckModal(resolveStudentResult(matches[0]))
+    }
+  }
+
+  const handleCheckKeyDown = (e) => {
+    if (e.key === 'Enter') handleCheck()
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Seleksi Klub</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3.
-          </p>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Seleksi Klub</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSoundOn((v) => !v)}
+            className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
+            title={soundOn ? 'Matikan suara' : 'Nyalakan suara'}
+          >
+            {soundOn ? '🔊' : '🔇'}
+          </button>
         </header>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -320,6 +550,38 @@ export default function App() {
             </div>
 
             <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-slate-900">Cek hasil kamu</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Masukkan nama (dan kelas kalau ada nama yang sama), lalu tekan Cek untuk lihat hasilnya.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  value={checkName}
+                  onChange={(e) => setCheckName(e.target.value)}
+                  onKeyDown={handleCheckKeyDown}
+                  placeholder="Nama kamu"
+                  className="min-w-[180px] flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+                <input
+                  type="text"
+                  value={checkKelas}
+                  onChange={(e) => setCheckKelas(e.target.value)}
+                  onKeyDown={handleCheckKeyDown}
+                  placeholder="Kelas (opsional)"
+                  className="w-40 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+                <button
+                  onClick={handleCheck}
+                  disabled={!checkName.trim()}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Cek
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-semibold text-slate-900">Ringkasan per klub</h2>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-left text-sm">
@@ -349,162 +611,17 @@ export default function App() {
                 </table>
               </div>
             </div>
-
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm w-fit">
-                <button
-                  onClick={() => setView('tabel')}
-                  className={`rounded-md px-3 py-1.5 transition ${view === 'tabel' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-                >
-                  Tabel detail
-                </button>
-                <button
-                  onClick={() => setView('per-klub')}
-                  className={`rounded-md px-3 py-1.5 transition ${view === 'per-klub' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-                >
-                  Daftar per klub
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari nama..."
-                  className="w-56 rounded-lg border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                    aria-label="Hapus pencarian"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {view === 'tabel' && (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold text-slate-900">Detail siswa</h2>
-                  <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm">
-                    <button
-                      onClick={() => setFilter('semua')}
-                      className={`rounded-md px-3 py-1 transition ${filter === 'semua' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-                    >
-                      Semua ({processed.results.length})
-                    </button>
-                    <button
-                      onClick={() => setFilter('tergeser')}
-                      className={`rounded-md px-3 py-1 transition ${filter === 'tergeser' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-                    >
-                      Tereliminasi Pilihan 1 ({tergeserCount})
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[820px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                        <th className="py-2 pr-4">#</th>
-                        <th className="py-2 pr-4">Timestamp</th>
-                        <th className="py-2 pr-4">Nama</th>
-                        <th className="py-2 pr-4">Kelas</th>
-                        <th className="py-2 pr-4">Pilihan 1</th>
-                        <th className="py-2 pr-4">Klub final</th>
-                        <th className="py-2 pr-4">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleRows.map((r, i) => (
-                        <tr key={`${r.nama}-${r.idx}`} className="border-b border-slate-100 last:border-0">
-                          <td className="py-2 pr-4 text-slate-400">{i + 1}</td>
-                          <td className="py-2 pr-4 whitespace-nowrap text-slate-500">{r.timestampRaw}</td>
-                          <td className="py-2 pr-4 font-medium text-slate-800">{r.nama}</td>
-                          <td className="py-2 pr-4 text-slate-600">{r.kelas}</td>
-                          <td className="py-2 pr-4 text-slate-600">{r.pilihan1}</td>
-                          <td className="py-2 pr-4 text-slate-600">{r.assigned ?? '—'}</td>
-                          <td className="py-2 pr-4"><StatusBadge choiceIndex={r.choiceIndex} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {visibleRows.length === 0 && (
-                    <p className="py-6 text-center text-sm text-slate-400">Tidak ada data untuk filter ini.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {view === 'per-klub' && (
-              <div className="mt-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {clubTabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setSelectedClub(tab.key)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                        tab.key === activeClubKey
-                          ? tab.key === NO_CLUB
-                            ? 'bg-red-600 text-white'
-                            : 'bg-slate-900 text-white'
-                          : tab.key === NO_CLUB
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {tab.label} <span className="opacity-70">({tab.members.length})</span>
-                    </button>
-                  ))}
-                </div>
-
-                {activeClubTab && (
-                  <div
-                    className={`mt-3 rounded-xl border p-5 shadow-sm ${
-                      activeClubTab.key === NO_CLUB ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-baseline justify-between">
-                      <h3 className={`text-sm font-semibold ${activeClubTab.key === NO_CLUB ? 'text-red-700' : 'text-slate-900'}`}>
-                        {activeClubTab.label}
-                      </h3>
-                      <span className={`text-xs ${activeClubTab.key === NO_CLUB ? 'text-red-400' : 'text-slate-400'}`}>
-                        {activeClubTab.key === NO_CLUB ? `${activeClubTab.members.length} siswa` : `${activeClubTab.members.length} / ${capacity}`}
-                      </span>
-                    </div>
-
-                    <ul className={`mt-3 divide-y ${activeClubTab.key === NO_CLUB ? 'divide-red-100' : 'divide-slate-100'}`}>
-                      {activeClubMembers.map((m) => (
-                        <li key={`${m.nama}-${m.idx}`} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
-                          <span className="text-slate-700">
-                            {m.nama} <span className="text-slate-400">— {m.kelas}</span>
-                          </span>
-                          {activeClubTab.key === NO_CLUB ? (
-                            <span className="text-xs text-slate-500">
-                              {[m.pilihan1, m.pilihan2, m.pilihan3].filter(Boolean).join(' · ')}
-                            </span>
-                          ) : (
-                            m.choiceIndex !== 0 && (
-                              <span className="shrink-0 text-xs font-medium text-amber-600">{CHOICE_LABEL[m.choiceIndex]}</span>
-                            )
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    {activeClubMembers.length === 0 && (
-                      <p className="py-6 text-center text-sm text-slate-400">Tidak ada nama yang cocok.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </>
         )}
       </div>
+
+      <CheckModal
+        result={checkModal}
+        onClose={() => setCheckModal(null)}
+        onSelectMatch={(student) => setCheckModal(resolveStudentResult(student))}
+        openClubs={openClubs}
+        capacity={capacity}
+      />
     </div>
   )
 }
