@@ -137,6 +137,7 @@ export default function App() {
   const [error, setError] = useState('')
   const [view, setView] = useState('tabel') // 'tabel' | 'per-klub'
   const [selectedClub, setSelectedClub] = useState(null)
+  const [search, setSearch] = useState('')
 
   const handleProcess = () => {
     setError('')
@@ -201,9 +202,18 @@ export default function App() {
 
   const visibleRows = useMemo(() => {
     if (!processed) return []
-    if (filter === 'tergeser') return processed.results.filter((r) => r.choiceIndex !== 0)
-    return processed.results
-  }, [processed, filter])
+    let rows = filter === 'tergeser' ? processed.results.filter((r) => r.choiceIndex !== 0) : processed.results
+    const q = search.trim().toLowerCase()
+    if (q) rows = rows.filter((r) => r.nama.toLowerCase().includes(q))
+    return rows
+  }, [processed, filter, search])
+
+  const activeClubMembers = useMemo(() => {
+    if (!activeClubTab) return []
+    const q = search.trim().toLowerCase()
+    if (!q) return activeClubTab.members
+    return activeClubTab.members.filter((m) => m.nama.toLowerCase().includes(q))
+  }, [activeClubTab, search])
 
   const tergeserCount = processed ? processed.results.filter((r) => r.choiceIndex !== 0).length : 0
   const noClubCount = processed ? processed.results.filter((r) => r.choiceIndex === -1).length : 0
@@ -324,19 +334,40 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mt-6 flex gap-1 rounded-lg bg-slate-100 p-1 text-sm w-fit">
-              <button
-                onClick={() => setView('tabel')}
-                className={`rounded-md px-3 py-1.5 transition ${view === 'tabel' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-              >
-                Tabel detail
-              </button>
-              <button
-                onClick={() => setView('per-klub')}
-                className={`rounded-md px-3 py-1.5 transition ${view === 'per-klub' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
-              >
-                Daftar per klub
-              </button>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm w-fit">
+                <button
+                  onClick={() => setView('tabel')}
+                  className={`rounded-md px-3 py-1.5 transition ${view === 'tabel' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                >
+                  Tabel detail
+                </button>
+                <button
+                  onClick={() => setView('per-klub')}
+                  className={`rounded-md px-3 py-1.5 transition ${view === 'per-klub' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                >
+                  Daftar per klub
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Cari nama..."
+                  className="w-56 rounded-lg border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                    aria-label="Hapus pencarian"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
             {view === 'tabel' && (
@@ -431,7 +462,7 @@ export default function App() {
                     </div>
 
                     <ul className={`mt-3 divide-y ${activeClubTab.key === NO_CLUB ? 'divide-red-100' : 'divide-slate-100'}`}>
-                      {activeClubTab.members.map((m) => (
+                      {activeClubMembers.map((m) => (
                         <li key={`${m.nama}-${m.idx}`} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
                           <span className="text-slate-700">
                             {m.nama} <span className="text-slate-400">— {m.kelas}</span>
@@ -448,6 +479,9 @@ export default function App() {
                         </li>
                       ))}
                     </ul>
+                    {activeClubMembers.length === 0 && (
+                      <p className="py-6 text-center text-sm text-slate-400">Tidak ada nama yang cocok.</p>
+                    )}
                   </div>
                 )}
               </div>
