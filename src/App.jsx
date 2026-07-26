@@ -1,11 +1,6 @@
 import { useState, useMemo } from 'react'
 import { SEED_DATA } from './sampleData'
 
-const SAMPLE = `Timestamp\tNama\tKelas\tPILIHAN 1\tPILIHAN 2\tPILIHAN 3
-7/25/2026 15:00:18\tJasper Edrick Candra\tXI DKV 2\tPERFORMING ARTS (TE\tBROADCAST\tENGLISH CLUB
-7/25/2026 15:00:19\tJessen Julius\tXI RPL\tSKETSA DAN ILUSTRAS\tENGLISH CLUB\tFOTOGRAFI
-7/25/2026 15:00:20\tWilson Corneles\tXI RPL\tENGLISH CLUB\tPERFORMING ARTS (TE\tSKETSA DAN ILUSTRAS`
-
 function parseTimestamp(raw) {
   const t = Date.parse(raw)
   return Number.isNaN(t) ? null : t
@@ -94,12 +89,6 @@ function assignClubs(students, capacity) {
   return { results, counts }
 }
 
-const CHOICE_LABEL = {
-  0: 'Pilihan 1',
-  1: 'Pilihan 2',
-  2: 'Pilihan 3',
-}
-
 const STATUS_STYLE = {
   0: { label: 'Diterima — Pilihan 1' },
   1: { label: 'Tergeser ke Pilihan 2' },
@@ -138,6 +127,14 @@ function downloadCSV(rows) {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+// Data pendaftaran sudah final, jadi hasil seleksi cukup dihitung sekali saat
+// aplikasi dimuat — tidak perlu lagi tempel data atau proses ulang.
+const CAPACITY = 28
+const PROCESSED = (() => {
+  const students = parseData(SEED_DATA)
+  return students.length > 0 ? assignClubs(students, CAPACITY) : { results: [], counts: {} }
+})()
 
 const CONFETTI_COLORS = ['#f43f5e', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6']
 
@@ -276,9 +273,28 @@ function CheckModal({ result, onClose, onSelectMatch, openClubs, capacity }) {
             <p className="text-sm text-slate-500">{result.student.kelas}</p>
             <p className="mt-4 text-sm text-slate-600">Kamu lolos di</p>
             <p className="mt-1 text-2xl font-bold text-emerald-700">{result.student.assigned}</p>
-            <p className="mt-3 text-xs font-medium text-emerald-600">
-              Diterima lewat {CHOICE_LABEL[result.student.choiceIndex]}
-            </p>
+
+            {result.student.choiceIndex === 0 ? (
+              <p className="mt-3 text-xs font-medium text-emerald-600">
+                Diterima langsung lewat Pilihan 1 🎯
+              </p>
+            ) : result.student.choiceIndex === 1 ? (
+              <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200">
+                <p className="font-medium">Pilihan 1 kamu ({result.student.pilihan1}) sudah penuh duluan,</p>
+                <p className="mt-0.5">
+                  tapi kamu tetap keterima lewat <span className="font-semibold">Pilihan 2 ({result.student.pilihan2})</span>!
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200">
+                <p className="font-medium">
+                  Pilihan 1 ({result.student.pilihan1}) dan Pilihan 2 ({result.student.pilihan2}) kamu sudah penuh duluan,
+                </p>
+                <p className="mt-0.5">
+                  tapi kamu tetap keterima lewat <span className="font-semibold">Pilihan 3 ({result.student.pilihan3})</span>!
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -352,26 +368,12 @@ function CheckModal({ result, onClose, onSelectMatch, openClubs, capacity }) {
 }
 
 export default function App() {
-  const [rawInput, setRawInput] = useState('')
-  const [capacity, setCapacity] = useState(28)
-  const [processed, setProcessed] = useState(null) // { results, counts }
-  const [error, setError] = useState('')
   const [checkName, setCheckName] = useState('')
   const [checkKelas, setCheckKelas] = useState('')
   const [checkModal, setCheckModal] = useState(null)
-  const [soundOn, setSoundOn] = useState(true)
 
-  const handleProcess = () => {
-    setError('')
-    const students = parseData(rawInput)
-    if (students.length === 0) {
-      setError('Tidak ada data yang terbaca. Pastikan format: Timestamp, Nama, Kelas, Pilihan 1, Pilihan 2, Pilihan 3 (dipisah tab, hasil copy-paste dari Google Sheets).')
-      setProcessed(null)
-      return
-    }
-    setProcessed(assignClubs(students, Number(capacity) || 15))
-    setCheckModal(null)
-  }
+  const processed = PROCESSED
+  const capacity = CAPACITY
 
   const clubSummary = useMemo(() => {
     if (!processed) return []
@@ -420,10 +422,8 @@ export default function App() {
   }, [processed, allClubNames, capacity])
 
   const resolveStudentResult = (student) => {
-    if (soundOn) {
-      if (student.assigned) playSuccessSound()
-      else playFailSound()
-    }
+    if (student.assigned) playSuccessSound()
+    else playFailSound()
     return {
       type: student.assigned ? 'success' : 'rejected',
       student,
@@ -464,155 +464,86 @@ export default function App() {
               Menentukan siapa yang tereliminasi dari <span className="font-medium text-slate-700">Pilihan 1</span> berdasarkan urutan timestamp. Semua Pilihan 1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan 2, lalu Pilihan 3. <span className="font-medium text-slate-700">(Dibuat oleh Team XI RPL)</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSoundOn((v) => !v)}
-            className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
-            title={soundOn ? 'Matikan suara' : 'Nyalakan suara'}
-          >
-            {soundOn ? '🔊' : '🔇'}
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={() => downloadCSV(processed.results)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
+            >
+              Unduh CSV
+            </button>
+          </div>
         </header>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                <label className="block text-sm font-medium text-slate-700">
-                  Tempel data (copy dari Google Sheets: Timestamp, Nama, Kelas, Pilihan 1-3)
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRawInput(SEED_DATA)}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
-                  >
-                    Muat data (162 siswa)
-                  </button>
-                  {rawInput && (
-                    <button
-                      type="button"
-                      onClick={() => setRawInput('')}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100"
-                    >
-                      Kosongkan
-                    </button>
-                  )}
-                </div>
-              </div>
-              <textarea
-                value={rawInput}
-                onChange={(e) => setRawInput(e.target.value)}
-                placeholder={SAMPLE}
-                rows={8}
-                className="w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-end gap-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Kuota per klub</label>
-              <input
-                type="number"
-                min={1}
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className="w-28 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-              />
-            </div>
+          <h2 className="text-sm font-semibold text-slate-900">Cek hasil kamu</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Masukkan nama (dan kelas kalau ada nama yang sama), lalu tekan Cek untuk lihat hasilnya.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <input
+              type="text"
+              value={checkName}
+              onChange={(e) => setCheckName(e.target.value)}
+              onKeyDown={handleCheckKeyDown}
+              placeholder="Nama kamu"
+              autoFocus
+              className="min-w-[180px] flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+            <input
+              type="text"
+              value={checkKelas}
+              onChange={(e) => setCheckKelas(e.target.value)}
+              onKeyDown={handleCheckKeyDown}
+              placeholder="Kelas (opsional)"
+              className="w-40 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
             <button
-              onClick={handleProcess}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              onClick={handleCheck}
+              disabled={!checkName.trim()}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Proses
+              Cek
             </button>
-            {processed && (
-              <button
-                onClick={() => downloadCSV(processed.results)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-              >
-                Unduh CSV
-              </button>
-            )}
           </div>
-
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
 
-        {processed && (
-          <>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard label="Total siswa" value={processed.results.length} />
-              <StatCard label="Diterima Pilihan 1" value={processed.results.length - tergeserCount} accent="emerald" />
-              <StatCard label="Tergeser (Pilihan 2/3)" value={tergeserCount} accent="amber" />
-              <StatCard label="Tidak dapat klub" value={noClubCount} accent="red" />
-            </div>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Total siswa" value={processed.results.length} />
+          <StatCard label="Diterima Pilihan 1" value={processed.results.length - tergeserCount} accent="emerald" />
+          <StatCard label="Tergeser (Pilihan 2/3)" value={tergeserCount} accent="amber" />
+          <StatCard label="Tidak dapat klub" value={noClubCount} accent="red" />
+        </div>
 
-            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Cek hasil kamu</h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Masukkan nama (dan kelas kalau ada nama yang sama), lalu tekan Cek untuk lihat hasilnya.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-3">
-                <input
-                  type="text"
-                  value={checkName}
-                  onChange={(e) => setCheckName(e.target.value)}
-                  onKeyDown={handleCheckKeyDown}
-                  placeholder="Nama kamu"
-                  className="min-w-[180px] flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                />
-                <input
-                  type="text"
-                  value={checkKelas}
-                  onChange={(e) => setCheckKelas(e.target.value)}
-                  onKeyDown={handleCheckKeyDown}
-                  placeholder="Kelas (opsional)"
-                  className="w-40 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                />
-                <button
-                  onClick={handleCheck}
-                  disabled={!checkName.trim()}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Cek
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900">Ringkasan per klub</h2>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                      <th className="py-2 pr-4">Klub</th>
-                      <th className="py-2 pr-4">Peminat Pilihan 1</th>
-                      <th className="py-2 pr-4">Diterima dari Pilihan 1</th>
-                      <th className="py-2 pr-4">Tereliminasi dari Pilihan 1</th>
-                      <th className="py-2 pr-4">Total akhir</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {clubSummary.map((c) => (
-                      <tr key={c.club} className="border-b border-slate-100 last:border-0">
-                        <td className="py-2 pr-4 font-medium text-slate-800">{c.club}</td>
-                        <td className="py-2 pr-4 text-slate-600">{c.requested1}</td>
-                        <td className="py-2 pr-4 text-slate-600">{c.accepted1}</td>
-                        <td className="py-2 pr-4 text-slate-600">{Math.max(c.requested1 - c.accepted1, 0)}</td>
-                        <td className="py-2 pr-4 text-slate-600">
-                          {c.final}
-                          <span className="text-slate-400"> / {capacity}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Ringkasan per klub</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                  <th className="py-2 pr-4">Klub</th>
+                  <th className="py-2 pr-4">Peminat Pilihan 1</th>
+                  <th className="py-2 pr-4">Diterima dari Pilihan 1</th>
+                  <th className="py-2 pr-4">Tereliminasi dari Pilihan 1</th>
+                  <th className="py-2 pr-4">Total akhir</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clubSummary.map((c) => (
+                  <tr key={c.club} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-4 font-medium text-slate-800">{c.club}</td>
+                    <td className="py-2 pr-4 text-slate-600">{c.requested1}</td>
+                    <td className="py-2 pr-4 text-slate-600">{c.accepted1}</td>
+                    <td className="py-2 pr-4 text-slate-600">{Math.max(c.requested1 - c.accepted1, 0)}</td>
+                    <td className="py-2 pr-4 text-slate-600">
+                      {c.final}
+                      <span className="text-slate-400"> / {capacity}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <CheckModal
