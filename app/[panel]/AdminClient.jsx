@@ -349,10 +349,99 @@ function ImportTab({ notify }) {
   )
 }
 
+function DatabaseTab({ notify }) {
+  const [info, setInfo] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/database')
+    const json = await res.json()
+    setInfo(json.info ?? null)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const run = async (action, confirmMsg) => {
+    if (confirmMsg && !confirm(confirmMsg)) return
+    setBusy(true)
+    const res = await fetch('/api/admin/database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    const json = await res.json()
+    setBusy(false)
+    if (!res.ok) return notify(json.error ?? 'Gagal.', 'error')
+    notify(
+      action === 'wipe_students'
+        ? `Data lama dihapus (${json.deleted} baris) & storage dibebaskan.`
+        : 'Storage dibersihkan.'
+    )
+    load()
+  }
+
+  return (
+    <div>
+      <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <p className="text-sm text-slate-400">
+          Menghapus data biasa (tombol "Hapus" / "Reset semua peserta") cuma menandai baris sebagai
+          terhapus — di Postgres/Neon baris itu tetap makan storage sampai dibersihkan pakai
+          <span className="mx-1 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-slate-300">VACUUM</span>.
+          Pakai tombol di bawah buat beneran membebaskan storage-nya.
+        </p>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-500">Memuat info database…</p>
+        ) : info && (
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p className="text-xs text-slate-500">Peserta</p>
+              <p className="mt-1 text-sm font-semibold text-white">{info.students_count} baris</p>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p className="text-xs text-slate-500">Tabel peserta</p>
+              <p className="mt-1 text-sm font-semibold text-white">{info.students_size}</p>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p className="text-xs text-slate-500">Klub</p>
+              <p className="mt-1 text-sm font-semibold text-white">{info.clubs_count} baris</p>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p className="text-xs text-slate-500">Total database</p>
+              <p className="mt-1 text-sm font-semibold text-white">{info.database_size}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            disabled={busy}
+            onClick={() => run('wipe_students', 'Hapus SEMUA data peserta secara PERMANEN dan bebaskan storage-nya? Klub tidak ikut terhapus. Aksi ini tidak bisa dibatalkan — pastikan sudah unduh CSV kalau perlu.')}
+            className="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Memproses…' : 'Hapus data peserta lama & bebaskan storage'}
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => run('vacuum')}
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'Memproses…' : 'Bersihkan sisa storage (VACUUM)'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const TABS = [
   { key: 'clubs', label: 'Klub & Kuota' },
   { key: 'students', label: 'Peserta' },
   { key: 'import', label: 'Import massal' },
+  { key: 'database', label: 'Database' },
 ]
 
 export default function AdminClient() {
@@ -419,6 +508,7 @@ export default function AdminClient() {
           {tab === 'clubs' && <ClubsTab notify={notify} />}
           {tab === 'students' && <StudentsTab notify={notify} />}
           {tab === 'import' && <ImportTab notify={notify} />}
+          {tab === 'database' && <DatabaseTab notify={notify} />}
         </div>
       </div>
       <Toast message={toast?.message} kind={toast?.kind} />
