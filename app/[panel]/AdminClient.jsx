@@ -33,7 +33,7 @@ function LoginForm({ onLoggedIn }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">Panel Pengelola</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-300">Panel Pengelola</p>
         <h1 className="mt-1 font-display text-2xl font-bold text-white">Masuk</h1>
         <p className="mt-2 text-sm text-slate-400">Masukkan password untuk mengelola klub, kuota, dan data peserta.</p>
 
@@ -43,14 +43,14 @@ function LoginForm({ onLoggedIn }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+          className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500/30"
         />
-        {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-xs font-medium text-slate-200">{error}</p>}
 
         <button
           type="submit"
           disabled={loading || !password}
-          className="mt-4 w-full rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-4 w-full rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? 'Memeriksa…' : 'Masuk'}
         </button>
@@ -61,9 +61,11 @@ function LoginForm({ onLoggedIn }) {
 
 function Toast({ message, kind }) {
   if (!message) return null
-  const color = kind === 'error' ? 'bg-red-600' : 'bg-emerald-600'
+  const style = kind === 'error'
+    ? 'bg-white text-slate-900'
+    : 'border border-slate-600 bg-slate-800 text-white'
   return (
-    <div className={`fixed bottom-5 right-5 z-50 rounded-lg ${color} px-4 py-2.5 text-sm text-white shadow-xl`}>
+    <div className={`fixed bottom-5 right-5 z-50 rounded-lg ${style} px-4 py-2.5 text-sm shadow-xl`}>
       {message}
     </div>
   )
@@ -132,13 +134,13 @@ function ClubsTab({ notify }) {
       <form onSubmit={addClub} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
         <div className="flex-1 min-w-[200px]">
           <label className="text-xs font-medium text-slate-400">Nama klub baru</label>
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="mis. ROBOTIK" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none" />
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="mis. ROBOTIK" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none" />
         </div>
         <div>
           <label className="text-xs font-medium text-slate-400">Kuota</label>
-          <input type="number" min="0" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="mt-1 w-24 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+          <input type="number" min="0" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="mt-1 w-24 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-slate-400 focus:outline-none" />
         </div>
-        <button type="submit" className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400">Tambah klub</button>
+        <button type="submit" className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-200">Tambah klub</button>
       </form>
 
       <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
@@ -159,7 +161,7 @@ function ClubsTab({ notify }) {
                     <input
                       defaultValue={c.name}
                       onChange={(e) => setEdits((s) => ({ ...s, [c.id]: { ...s[c.id], name: e.target.value } }))}
-                      className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-indigo-400 focus:bg-slate-800 focus:outline-none"
+                      className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-slate-400 focus:bg-slate-800 focus:outline-none"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -168,12 +170,12 @@ function ClubsTab({ notify }) {
                       min="0"
                       defaultValue={c.capacity}
                       onChange={(e) => setEdits((s) => ({ ...s, [c.id]: { ...s[c.id], capacity: Number(e.target.value) } }))}
-                      className="w-24 rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-indigo-400 focus:bg-slate-800 focus:outline-none"
+                      className="w-24 rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-slate-400 focus:bg-slate-800 focus:outline-none"
                     />
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <button onClick={() => saveEdit(c.id)} disabled={!edits[c.id]} className="mr-2 rounded-md bg-emerald-600/90 px-3 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-30 hover:bg-emerald-500">Simpan</button>
-                    <button onClick={() => removeClub(c.id, c.name)} className="rounded-md bg-red-600/90 px-3 py-1 text-xs font-medium text-white hover:bg-red-500">Hapus</button>
+                    <button onClick={() => saveEdit(c.id)} disabled={!edits[c.id]} className="mr-2 rounded-md bg-slate-200 px-3 py-1 text-xs font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white">Simpan</button>
+                    <button onClick={() => removeClub(c.id, c.name)} className="rounded-md border border-slate-500 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-white hover:text-slate-900">Hapus</button>
                   </td>
                 </tr>
               )
@@ -249,11 +251,11 @@ function StudentsTab({ notify }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cari nama / kelas…"
-          className="w-64 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+          className="w-64 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
         />
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500">{students.length} peserta total</span>
-          <button onClick={resetAll} className="rounded-lg border border-red-800 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-950">Reset semua peserta</button>
+          <button onClick={resetAll} className="rounded-lg border border-slate-500 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white hover:text-slate-900">Reset semua peserta</button>
         </div>
       </div>
 
@@ -277,7 +279,7 @@ function StudentsTab({ notify }) {
                 <input
                   defaultValue={s[key === 'timestampRaw' ? 'timestamp_raw' : key]}
                   onChange={(e) => setEdits((prev) => ({ ...prev, [s.id]: { ...prev[s.id], [key]: e.target.value } }))}
-                  className={`${width} rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-indigo-400 focus:bg-slate-800 focus:outline-none`}
+                  className={`${width} rounded-md border border-transparent bg-transparent px-2 py-1 text-slate-100 hover:border-slate-700 focus:border-slate-400 focus:bg-slate-800 focus:outline-none`}
                 />
               )
               return (
@@ -289,8 +291,8 @@ function StudentsTab({ notify }) {
                   <td className="px-3 py-2">{field('pilihan2', 'w-40')}</td>
                   <td className="px-3 py-2">{field('pilihan3', 'w-40')}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button onClick={() => saveEdit(s.id)} disabled={!edits[s.id]} className="mr-2 rounded-md bg-emerald-600/90 px-3 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-30 hover:bg-emerald-500">Simpan</button>
-                    <button onClick={() => removeStudent(s.id, s.nama)} className="rounded-md bg-red-600/90 px-3 py-1 text-xs font-medium text-white hover:bg-red-500">Hapus</button>
+                    <button onClick={() => saveEdit(s.id)} disabled={!edits[s.id]} className="mr-2 rounded-md bg-slate-200 px-3 py-1 text-xs font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white">Simpan</button>
+                    <button onClick={() => removeStudent(s.id, s.nama)} className="rounded-md border border-slate-500 px-3 py-1 text-xs font-medium text-slate-200 hover:bg-white hover:text-slate-900">Hapus</button>
                   </td>
                 </tr>
               )
@@ -335,13 +337,13 @@ function ImportTab({ notify }) {
         onChange={(e) => setText(e.target.value)}
         rows={10}
         placeholder="Tempel data di sini…"
-        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+        className="mt-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
       />
       <div className="mt-3 flex flex-wrap gap-3">
-        <button onClick={() => doImport('append')} disabled={loading || !text.trim()} className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40">
+        <button onClick={() => doImport('append')} disabled={loading || !text.trim()} className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40">
           Tambahkan ke data yang ada
         </button>
-        <button onClick={() => doImport('replace')} disabled={loading || !text.trim()} className="rounded-lg border border-red-800 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40">
+        <button onClick={() => doImport('replace')} disabled={loading || !text.trim()} className="rounded-lg border border-slate-500 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40">
           Ganti semua data (reset dulu)
         </button>
       </div>
@@ -420,7 +422,7 @@ function DatabaseTab({ notify }) {
           <button
             disabled={busy}
             onClick={() => run('wipe_students', 'Hapus SEMUA data peserta secara PERMANEN dan bebaskan storage-nya? Klub tidak ikut terhapus. Aksi ini tidak bisa dibatalkan — pastikan sudah unduh CSV kalau perlu.')}
-            className="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border-2 border-white px-4 py-2 text-sm font-medium text-white hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? 'Memproses…' : 'Hapus data peserta lama & bebaskan storage'}
           </button>
@@ -480,7 +482,7 @@ export default function AdminClient() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400">Panel Pengelola</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-300">Panel Pengelola</p>
             <h1 className="mt-1 font-display text-2xl font-bold text-white">Kelola Seleksi Klub</h1>
           </div>
           <div className="flex gap-2">
@@ -496,7 +498,7 @@ export default function AdminClient() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-                tab === t.key ? 'border-indigo-400 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
+                tab === t.key ? 'border-white text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               {t.label}
