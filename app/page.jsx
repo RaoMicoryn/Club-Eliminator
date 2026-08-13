@@ -279,44 +279,211 @@ function DepartureStat({ label, value }) {
   )
 }
 
+// Palet warna otomatis untuk klub baru yang belum dikenali di daftar manual di bawah.
+// Ditambah terus kalau suatu saat kurang - urutan tidak masalah karena dipilih via hash.
+const CLUB_AUTO_PALETTE = [
+  '#38bdf8', '#fb923c', '#f472b6', '#a78bfa', '#34d399', '#fb7185',
+  '#facc15', '#4ade80', '#60a5fa', '#f97316', '#e879f9', '#2dd4bf',
+  '#f87171', '#c084fc', '#fbbf24', '#22d3ee', '#818cf8', '#fda4af',
+]
+
+// Hash sederhana & stabil dari nama klub -> index warna, supaya klub yang sama
+// selalu dapat warna yang sama tiap kali halaman di-reload (bukan random tiap render).
+function hashClubName(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function autoClubTone(name) {
+  const accent = CLUB_AUTO_PALETTE[hashClubName(name.trim().toLowerCase()) % CLUB_AUTO_PALETTE.length]
+  return { label: 'Klub', accent }
+}
+
+function clubTone(name) {
+  const key = name.toLowerCase()
+  // Klub "bawaan" tetap pakai warna & label custom seperti semula.
+  if (key.includes('coding')) return { label: 'Teknologi', accent: '#38bdf8' }
+  if (key.includes('volley')) return { label: 'Olahraga', accent: '#fb923c' }
+  if (key.includes('broadcast')) return { label: 'Media', accent: '#f472b6' }
+  if (key.includes('foto')) return { label: 'Kreatif', accent: '#a78bfa' }
+  if (key.includes('podcast')) return { label: 'Audio', accent: '#34d399' }
+  if (key.includes('robot')) return { label: 'Teknologi', accent: '#fb7185' }
+  // Klub baru dari admin panel -> warna otomatis dari palet, bukan abu-abu lagi.
+  return autoClubTone(name)
+}
+
 function ClubCard({ club }) {
+  const [expanded, setExpanded] = useState(false)
   const pct = club.capacity > 0 ? Math.min(100, Math.round((club.final / club.capacity) * 100)) : 0
   const eliminated = Math.max(club.requested1 - club.accepted1, 0)
+  const remaining = Math.max(club.capacity - club.final, 0)
+  const isEmpty = club.requested1 === 0
+  const tone = clubTone(club.club)
+
   return (
-    <div className="club-card rounded-2xl p-5">
-      <div className="relative z-10 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-slate-500">Club / Status</p>
-          <h3 className="mt-1 truncate font-display text-lg font-bold text-white">{club.club}</h3>
+    <article
+      className={`club-card rounded-2xl p-4 sm:p-5 ${expanded ? 'is-expanded' : ''} ${isEmpty ? 'is-empty' : ''}`}
+      style={{ '--club-accent': tone.accent }}
+      tabIndex={0}
+      onClick={() => setExpanded((v) => !v)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setExpanded((v) => !v)
+        }
+      }}
+      aria-label={`${club.club}. Ketuk atau hover untuk melihat detail.`}
+    >
+      <div className="club-card-main">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate font-display text-lg font-bold text-white">{club.club}</h3>
+            </div>
+            <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+              {tone.label} <span className="text-slate-700">·</span> {club.final} / {club.capacity}
+            </p>
+          </div>
+
+          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1 font-mono text-[9px] text-slate-400">
+            CAP {club.capacity}
+          </span>
         </div>
-        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[10px] text-slate-400">CAP {club.capacity}</span>
+
+        <div className="mt-5 flex items-center gap-3">
+          <div className="progress-track h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">
+            <div
+              className="progress-fill h-full rounded-full"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="text-accent w-9 text-right font-mono text-[10px] font-medium tabular-nums">
+            {pct}%
+          </span>
+        </div>
+
+        <div className="club-mini-stats mt-4 grid grid-cols-3 overflow-hidden rounded-xl border border-white/[0.055] bg-white/[0.025]">
+          <div className="px-2 py-3 text-center">
+            <p className="font-mono text-lg font-semibold leading-none text-white">{club.requested1}</p>
+            <p className="mt-1.5 text-[8px] uppercase tracking-[0.12em] text-slate-500">Peminat</p>
+          </div>
+          <div className="stat-accent border-x border-white/[0.07] px-2 py-3 text-center">
+            <p className="text-accent font-mono text-lg font-semibold leading-none">{club.accepted1}</p>
+            <p className="mt-1.5 text-[8px] uppercase tracking-[0.12em] text-slate-500">Lolos P1</p>
+          </div>
+          <div className="px-2 py-3 text-center">
+            <p className="font-mono text-lg font-semibold leading-none text-slate-200">{eliminated}</p>
+            <p className="mt-1.5 text-[8px] uppercase tracking-[0.12em] text-slate-500">Tergeser</p>
+          </div>
+        </div>
       </div>
 
-      <div className="relative z-10 mt-5">
-        <div className="progress-track h-2 w-full overflow-hidden rounded-full">
-          <div className="progress-fill h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
+      <div className="club-detail" aria-hidden={!expanded}>
+        <div className="club-detail-inner">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-accent font-mono text-[8px] uppercase tracking-[0.24em]">Detail klub</p>
+              <p className="mt-1 text-xs text-slate-400">{club.club} · {tone.label}</p>
+            </div>
+            <button
+              type="button"
+              className="club-detail-close rounded-full border border-white/10 px-2 py-1 text-xs text-slate-500 hover:text-white"
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpanded(false)
+              }}
+              aria-label="Tutup detail"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
+            <div className="rounded-lg bg-white/[0.035] px-3 py-2">
+              <span className="block text-slate-600">Kapasitas</span>
+              <strong className="mt-1 block font-mono text-white">{club.capacity} slot</strong>
+            </div>
+            <div className="rounded-lg bg-white/[0.035] px-3 py-2">
+              <span className="block text-slate-600">Peminat</span>
+              <strong className="mt-1 block font-mono text-white">{club.requested1} siswa</strong>
+            </div>
+            <div className="stat-accent rounded-lg px-3 py-2">
+              <span className="block text-slate-600">Lolos P1</span>
+              <strong className="text-accent mt-1 block font-mono">{club.accepted1} siswa</strong>
+            </div>
+            <div className="rounded-lg bg-white/[0.035] px-3 py-2">
+              <span className="block text-slate-600">Slot tersisa</span>
+              <strong className="text-accent mt-1 block font-mono">{remaining} slot</strong>
+            </div>
+          </div>
         </div>
-        <div className="mt-2 flex items-center justify-between font-mono text-[10px]">
-          <span className="text-slate-500">Occupancy</span>
-          <span className="text-cyan-300">{club.final}/{club.capacity} · {pct}%</span>
+      </div>
+    </article>
+  )
+}
+
+function ClubOverview({ clubs }) {
+  const totalFinal = clubs.reduce((sum, c) => sum + c.final, 0)
+  const totalCapacity = clubs.reduce((sum, c) => sum + c.capacity, 0)
+  const columns = [clubs.slice(0, 3), clubs.slice(3, 6)]
+
+  return (
+    <section className="club-overview">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="font-display text-xl font-bold tracking-tight text-white">Ringkasan <span className="text-cyan-300">per klub</span></h2>
+          <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">Tampilan dibuat ringkas. Hover kartu di desktop atau ketuk kartu di HP untuk melihat detail.</p>
+        </div>
+        <p className="shrink-0 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-600">{clubs.length} klub aktif</p>
+      </div>
+
+      <div className="club-overview-panel mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.018]">
+        <div className="grid gap-0 lg:grid-cols-[220px_1fr]">
+          <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
+            <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-slate-600">Total peminat</p>
+            <div className="mt-1 flex items-end gap-2">
+              <span className="font-display text-4xl font-bold tracking-tight text-white">{totalFinal}</span>
+              <span className="pb-1 font-mono text-[9px] text-slate-600">siswa</span>
+            </div>
+            <p className="mt-1 text-[10px] text-slate-600">dari {totalCapacity} slot tersedia</p>
+          </div>
+
+          <div className="p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-slate-600">Distribusi peminat</p>
+              <span className="font-mono text-[8px] text-slate-700">final placement</span>
+            </div>
+            <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              {columns.map((column, colIndex) => (
+                <div key={colIndex} className="space-y-3">
+                  {column.map((c) => {
+                    const pct = c.capacity > 0 ? Math.min(100, Math.round((c.final / c.capacity) * 100)) : 0
+                    const tone = clubTone(c.club)
+                    return (
+                      <div key={c.club} className="flex items-center gap-2.5" style={{ '--club-accent': tone.accent }}>
+                        <span className="w-[76px] truncate text-[10px] text-slate-400">{c.club}</span>
+                        <div className="progress-track h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">
+                          <div className="progress-fill h-full rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-accent w-7 text-right font-mono text-[9px] tabular-nums">{pct}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="relative z-10 mt-5 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 text-center">
-        <div className="rounded-xl bg-white/[0.025] px-2 py-2.5">
-          <p className="font-mono text-lg font-semibold text-white">{club.requested1}</p>
-          <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Peminat</p>
-        </div>
-        <div className="rounded-xl bg-white/[0.025] px-2 py-2.5">
-          <p className="font-mono text-lg font-semibold text-cyan-300">{club.accepted1}</p>
-          <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Lolos P1</p>
-        </div>
-        <div className="rounded-xl bg-white/[0.025] px-2 py-2.5">
-          <p className="font-mono text-lg font-semibold text-slate-300">{eliminated}</p>
-          <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">Tergeser</p>
-        </div>
+      <div className="club-card-grid mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {clubs.map((c) => <ClubCard key={c.club} club={c} />)}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -470,14 +637,8 @@ export default function Home() {
               <DepartureStat label="Gagal" value={noClubCount} />
             </div>
 
-            <div className="mt-10 flex items-end justify-between gap-4">
-              <h2 className="font-display text-xl font-bold tracking-tight text-white">Ringkasan per klub</h2>
-              <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-slate-600">{clubSummary.length} klub aktif</p>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {clubSummary.map((c) => (
-                <ClubCard key={c.club} club={c} />
-              ))}
+            <div className="mt-10">
+              <ClubOverview clubs={clubSummary} />
             </div>
           </>
         )}
