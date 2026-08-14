@@ -271,10 +271,12 @@ function CheckModal({ result, onClose, onSelectMatch, openClubs }) {
 }
 
 function DepartureStat({ label, value }) {
+  // Rounded outer corners datang dari overflow-hidden di grid pembungkus,
+  // jadi kartu ini nggak perlu rounding sendiri — aman dipakai di layout 2x2 (mobile) maupun 1 baris (desktop).
   return (
-    <div className="stat-card min-w-[145px] flex-1 px-5 py-5 first:rounded-l-2xl last:rounded-r-2xl">
+    <div className="stat-card min-w-0 px-4 py-4 sm:px-5 sm:py-5">
       <p className="relative z-10 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-slate-500">{label}</p>
-      <p className="relative z-10 mt-2 font-display text-3xl font-bold tabular-nums text-white">{String(value).padStart(2, '0')}</p>
+      <p className="relative z-10 mt-2 font-display text-2xl font-bold tabular-nums text-white sm:text-3xl">{String(value).padStart(2, '0')}</p>
     </div>
   )
 }
@@ -442,7 +444,7 @@ function ClubOverview({ clubs }) {
       </div>
 
       <div className="club-overview-panel mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.018]">
-        <div className="grid gap-0 lg:grid-cols-[220px_1fr]">
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[220px_1fr]">
           <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
             <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-slate-600">Total peminat</p>
             <div className="mt-1 flex items-end gap-2">
@@ -457,7 +459,7 @@ function ClubOverview({ clubs }) {
               <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-slate-600">Distribusi peminat</p>
               <span className="font-mono text-[8px] text-slate-700">final placement</span>
             </div>
-            <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
               {columns.map((column, colIndex) => (
                 <div key={colIndex} className="space-y-3">
                   {column.map((c) => {
@@ -480,7 +482,7 @@ function ClubOverview({ clubs }) {
         </div>
       </div>
 
-      <div className="club-card-grid mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="club-card-grid mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {clubs.map((c) => <ClubCard key={c.club} club={c} />)}
       </div>
     </section>
@@ -571,7 +573,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.3em] text-cyan-300/80">Team XI RPL <span className="text-slate-600">//</span> Sistem Seleksi</p>
+              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.3em] text-cyan-300/80">Oleh Team XI RPL <span className="text-slate-600">//</span> Sistem Seleksi</p>
               <h1 className="mt-3 font-display text-4xl font-bold tracking-[-0.04em] text-white sm:text-6xl">Seleksi Klub</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400 sm:text-[15px]">
                 Siapa yang tereliminasi dari <span className="font-medium text-cyan-200">Pilihan 1</span> ditentukan berdasarkan urutan timestamp. Semua Pilihan&nbsp;1 diproses & diprioritaskan dulu di tiap klub, baru sisa kuota dibagikan ke yang kepental lewat Pilihan&nbsp;2, lalu Pilihan&nbsp;3.
@@ -630,7 +632,7 @@ export default function Home() {
         {data && (
           <>
             {/* Departure-board style stat strip */}
-            <div className="grid overflow-hidden rounded-2xl border border-white/10 sm:grid-cols-4">
+            <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-white/10 sm:grid-cols-4">
               <DepartureStat label="Total Siswa" value={data.results.length} />
               <DepartureStat label="Lolos P1" value={data.results.length - tergeserCount} />
               <DepartureStat label="Tergeser" value={tergeserCount} />
